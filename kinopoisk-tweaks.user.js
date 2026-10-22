@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks (HD)
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Улучшение плеера Кинопоиска (HD): сохранение громкости, дорожек, управление меню.
 // @author       DeivBoo
 // @match        https://www.kinopoisk.ru/*
@@ -20,12 +20,12 @@
      */
     const SELECTORS = {
         player: 'video',
-        volumeSlider: '.player_volume_slider, [role="slider"]', 
-        audioTracks: '[data-track-id], .track_item, .audio_track_selector',           // Селекторы для дорожек
-        subtitles: '[data-subtitle-id], .subtitle_item, .subtitle_selector',           // Селекторы для субтитров
-        skipIntroBtn: '.btn_skip_intro, [data-action="skip-intro"], .skip-intro', 
-        skipCreditsBtn: '.btn_skip_credits, [data-action="skip-credits"], .skip-credits',
-        settingsIcon: '.player_settings_icon, .player_settings_btn, .settings_button' // Иконка настроек
+        volumeSlider: '.player_volume_slider, [role="slider"], input[type="range"]', 
+        audioTracks: '[data-track-id], .track_item, .audio_track_selector, .track-button',           // Селекторы для дорожек
+        subtitles: '[data-subtitle-id], .subtitle_item, .subtitle_selector, .subtitle-button',       // Селекторы для субтитров
+        skipIntroBtn: '.btn_skip_intro, [data-action="skip-intro"], .skip-intro, .skip_intro_button', 
+        skipCreditsBtn: '.btn_skip_credits, [data-action="skip-credits"], .skip-credits, .skip_credits_button',
+        settingsIcon: '.player_settings_icon, .player_settings_btn, .settings_button, .player_settings' // Иконка настроек
     };
 
     /**
@@ -113,8 +113,12 @@
         if (!shouldApplySavedSettings()) return;
 
         // 1. Громкость
-        if (config.volume !== undefined && player.volume !== config.volume) {
+        const volumeSlider = document.querySelector(SELECTORS.volumeSlider);
+        if (volumeSlider && config.volume !== undefined && player.volume !== config.volume) {
             player.volume = config.volume;
+            if (volumeSlider.type === 'range') {
+                volumeSlider.value = config.volume;
+            }
         }
 
         // 2. Кнопки пропуска
