@@ -5,8 +5,8 @@ Development of a Tampermonkey userscript to modify the player on the Kinopoisk w
 Goal: Improve UX by persisting user settings and modifying interface behavior.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**We are currently working on resolving Shadow DOM traversal issues.**
-The basic features work, but selectors fail on pages with deep shadow nesting. Your main goal right now is to implement a robust recursive search function and ensure existing features don't break.
+**We are currently working on implementing a recursive shadow DOM traversal function.**
+The basic features work, but selectors fail on pages with deep shadow nesting. Your main goal right now is to create a robust utility that can traverse multiple `shadowRoot` levels to find elements like the volume slider and skip buttons without breaking existing functionality.
 
 ## 🛠 Tech Stack
 *   **Environment:** WSL 2 (Ubuntu 26.04), Bionic (LM Studio), Playwright MCP.
@@ -61,4 +61,4 @@ When reaching context limits or completing a significant milestone, provide a st
 *   [x] Volume, audio track, and subtitle persistence implemented.
 *   [x] Settings menu with skip button visibility toggles implemented.
 *   [ ] Research and implementation of full Shadow DOM Traversal.
-*   [!] Known Issue: Current selectors may fail on pages where the player is deeply nested in Shadow Roots. Work on this is in progress.
+*   [!] Known Issue: Standard `document.querySelector` fails on many player controls because they are encapsulated in multiple nested shadow roots. Work on a recursive traversal utility is the current priority.
