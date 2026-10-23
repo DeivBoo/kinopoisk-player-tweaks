@@ -5,10 +5,17 @@ Development of a Tampermonkey userscript to modify the player on the Kinopoisk w
 Goal: Improve UX by persisting user settings and modifying interface behavior without breaking the React-based player.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**Project is stable at v2.1.4.** 
-All core features are fully implemented and working! The "Smart Overlay" successfully handles Hover-to-Click and Toggle (open/close) behavior for Settings, Audio, Seasons, and Send-to-device buttons. The Volume button is intentionally left untouched (native behavior) to prevent UI breaking.
+**Project is COMPLETE and STABLE at v2.2.0.**
+All requested features are fully implemented:
+- Volume Persistence
+- Audio Track Persistence
+- Subtitle Persistence (with forced click after audio change to override Kinopoisk's auto-reset)
+- Hide Skip Buttons (Intro/Credits/Next)
+- Hover-to-Click for 4 UI panels (Settings, Audio, Seasons, Send-to-device) via "Smart Overlay"
 
-Next steps: Address remaining UX nuances requested by the user (to be defined) or implement Subtitle persistence.
+Next steps (optional): 
+- Implement a native Tampermonkey settings menu (via `GM_registerMenuCommand`) to toggle `hideIntro`/`hideCredits` without editing code.
+- Investigate supporting multiple video players / trailers.
 
 ## 🛠 Tech Stack
 *   **Environment:** WSL 2 (Ubuntu 26.04), Bionic (LM Studio), Playwright MCP.
@@ -17,35 +24,40 @@ Next steps: Address remaining UX nuances requested by the user (to be defined) o
 *   **Testing:** Manual DOM inspection via Chrome DevTools + Playwright.
 
 ## 📂 Project Structure
-*   `kinopoisk-tweaks.user.js` - main userscript (v2.1.4).
+*   `kinopoisk-tweaks.user.js` - main userscript (v2.2.0).
 *   `AGENTS.md` - this file.
 
 ## 🎯 Core Tasks (Feature Roadmap)
 1.  [x] **Volume Persistence:** Remember volume.
 2.  [x] **Audio Track Persistence:** Remember and restore audio track.
-3.  [x] **Skip Buttons:** Hide "Skip Intro/Credits" buttons.
-4.  [x] **Menu Behavior Change (Hover-to-Click):** Implemented via the "Smart Overlay" trick for 4 main buttons.
-5.  [ ] **Subtitle Persistence:** Remember and restore subtitles.
-6.  [ ] **Settings UI:** Add a native Tampermonkey menu to toggle `hideIntro` and `hideCredits` flags.
+3.  [x] **Subtitle Persistence:** Remember and restore subtitles.
+4.  [x] **Skip Buttons:** Hide "Skip Intro/Credits/Next" buttons.
+5.  [x] **Menu Behavior Change (Hover-to-Click):** Implemented via the "Smart Overlay" trick for 4 main buttons.
+6.  [ ] **Settings UI:** Add a native Tampermonkey menu to toggle feature flags.
 
 ## ⚙️ Technical Implementation Details
 *   **The "Smart Overlay" Trick:** 
-    *   We inject a transparent `div` over the target button to intercept and block `mouseover`/`mouseenter` events (preventing the menu from opening on hover).
-    *   **Crucial detail for Toggle behavior:** We check the `aria-expanded` attribute of the underlying button every 100ms. 
-    *   If `aria-expanded="true"` (menu is open), we set `overlay.style.pointerEvents = 'none'`. This allows the *second* click to pass through the overlay directly to the button, allowing React to close the menu naturally.
-    *   If `aria-expanded="false"` (menu is closed), we set `pointerEvents = 'auto'` to block hover again.
-*   **Selectors:** Only use stable attributes (`data-test-id`, `data-tid`, `aria-label`, or stable class prefixes).
-*   **Timing:** React menus take time to render. Use `setTimeout` with retries for DOM interactions.
+    *   A transparent `div` intercepts `mouseover`/`mouseenter` to prevent menus from opening on hover.
+    *   If `aria-expanded="true"` (menu is open), the overlay gets `pointer-events: none`, allowing the second click to pass through and close the menu natively.
+    *   The Volume button is **intentionally excluded** from overlays because it's a complex container (hovering expands it to a slider); blocking it breaks UI behavior.
+*   **Restore Order:** Audio is set first, then a pause (500ms), then subtitles are forcibly clicked. This is required because Kinopoisk auto-resets subtitles to default (Russian) when the audio track changes.
+*   **Timings:** 
+    *   Start restore: 700ms after video detection.
+    *   Menu open -> Audio click: 400ms.
+    *   Audio -> Subtitle: 500ms.
+    *   Subtitle -> Menu close: 300ms.
+*   **Selectors:** Only stable attributes (`data-test-id`, `data-tid`, `aria-label`, stable class prefixes).
+*   **State Protection:** `isRestoring` flag prevents double restores. Overlay checks `getElementById` to prevent duplicates.
 
 ## ⚠️ Technical Constraints and Rules (CRITICAL)
 1.  **NO GLOBAL MUTATION OBSERVERS:** Use `setInterval` for polling.
 2.  **NO RECURSIVE DOM SEARCH:** Use known stable selectors.
-3.  **DO NOT BLOCK VOLUME HOVER:** The volume button is a complex container. Blocking hover on it breaks the UI (it just mutes/unmutes instead of showing the slider). Leave it native.
-4.  **NO BLIND EVENT OVERRIDES:** Do not try to `stopPropagation()` on `mouseenter/mouseover` globally or manually dispatch sequences of `mousedown`/`mouseup` in a way that breaks React's state. Use the Overlay trick.
+3.  **DO NOT BLOCK VOLUME HOVER:** Leave the volume button native.
+4.  **NO BLIND EVENT OVERRIDES:** Do not try to `stopPropagation()` on `mouseenter` globally or manually dispatch sequences of `mousedown`/`mouseup`. Use the Overlay trick.
 
 ## 🛑 Git Workflow Rules
 *   Do NOT run `git push`. Only `git add` and `git commit`.
 
 ## 📝 Current Status
-*   [x] Stable v2.1.4 committed.
-*   [!] Known Issue: Toggle behavior requires a 100ms tick to update `pointer-events`, which is imperceptible to the user but technically asynchronous.
+*   [x] Stable v2.2.0 committed.
+*   [!] Known Issue: Timings (400ms, 500ms) are tuned for a fast local machine. If the user reports flaky behavior on slow connections, consider increasing them.
