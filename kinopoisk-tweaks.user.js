@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks (HD)
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.9
 // @description  Улучшение плеера Кинопоиска (HD): сохранение громкости, дорожек, управление меню.
 // @author       DeivBoo
 // @match        https://www.kinopoisk.ru/*
@@ -20,12 +20,43 @@
      */
     const SELECTORS = {
         player: 'video',
-        volumeSlider: '.player_volume_slider, [role="slider"], input[type="range"]', 
-        audioTracks: '[data-track-id], .track_item, .audio_track_selector, .track-button',           // Селекторы для дорожек
-        subtitles: '[data-subtitle-id], .subtitle_item, .subtitle_selector, .subtitle-button',       // Селекторы для субтитров
-        skipIntroBtn: '.btn_skip_intro, [data-action="skip-intro"], .skip-intro, .skip_intro_button', 
-        skipCreditsBtn: '.btn_skip_credits, [data-action="skip-credits"], .skip-credits, .skip_credits_button',
-        settingsIcon: '.player_settings_icon, .player_settings_btn, .settings_button, .player_settings' // Иконка настроек
+        volumeSlider: '.styles_slider__WEhCa, .player_volume_slider, [role="slider"], input[type="range"]', 
+        audioTracks: '.styles_audio___FLvj [data-test-id="settings-item"], .track_item, .audio_track_selector',           // Селекторы для дорожек (HD)
+        subtitles: '.styles_subtitles__q8VTO [data-test-id="settings-item"], .subtitle_item, .subtitle_selector',                                                   // Селекторы для субтитров (HD)
+        skipIntroBtn: '.btn_skip_intro, .skip-intro, [data-action="skip-intro"]', 
+        skipCreditsBtn: '.btn_skip_credits, .skip-credits, [data-action="skip-credits"]',
+        settingsIcon: '.styles_audioSettingsButton__5hcYx, .styles_subtitleSizeSettingsButton__2akVU, .styles_settingsIcon__ULbja, .styles_settingsIcon__HYrcP' // Иконки настроек (HD)
+    };
+
+    /**
+     * Хранилище данных (адаптировано для работы в Tampermonkey и Playwright)
+     */
+    const storage = {
+        get: (key) => {
+            if (typeof GM !== 'undefined' && typeof GM.getValue === 'function') {
+                return GM.getValue(key, null);
+            }
+            const saved = localStorage.getItem('kp_tweaks_config');
+            const config = saved ? JSON.parse(saved) : {};
+            return config[key];
+        },
+        set: (key, value) => {
+            if (typeof GM !== 'undefined' && typeof GM.setValue === 'function') {
+                GM.setValue(key, value);
+            } else {
+                const current = localStorage.getItem('kp_tweaks_config');
+                const config = current ? JSON.parse(current) : {};
+                config[key] = value;
+                localStorage.setItem('kp_tweaks_config', JSON.stringify(config));
+            }
+        },
+        getAll: () => {
+            if (typeof GM !== 'undefined' && typeof GM.getValue === 'function') {
+                return GM.getValue('kp_tweaks_config', {});
+            }
+            const saved = localStorage.getItem('kp_tweaks_config');
+            return saved ? JSON.parse(saved) : {};
+        }
     };
 
     /**
@@ -45,19 +76,19 @@
     let config = {};
 
     /**
-     * Загрузка настроек из хранилища GM
+     * Загрузка настроек
      */
     function loadConfig() {
-        const saved = GM_getValue('kp_tweaks_config', {});
+        const saved = storage.getAll();
         config = { ...DEFAULT_CONFIG, ...saved };
         console.log('[KP Tweaks] Конфигурация загружена:', config);
     }
 
     /**
-     * Сохранение настроек в хранилище GM
+     * Сохранение настроек
      */
     function saveConfig() {
-        GM_setValue('kp_tweaks_config', config);
+        storage.set('kp_tweaks_config', config);
         console.log('[KP Tweaks] Конфигурация сохранена.');
     }
 
@@ -97,11 +128,10 @@
             config.lastContentType = current.contentType;
             return true;
         } else {
-            // Новый контент - сброс к дефолтам для звука и кнопок пропуска
+            // Новый контент - сброс к дефолтам в памяти без перезаписи localStorage
             config.volume = DEFAULT_CONFIG.volume;
             config.skipIntroBtnVisible = DEFAULT_CONFIG.skipIntroBtnVisible;
             config.skipCreditsBtnVisible = DEFAULT_CONFIG.skipCreditsBtnVisible;
-            saveConfig();
             return false;
         }
     }
@@ -112,24 +142,28 @@
     function applyPlayerSettings(player) {
         if (!shouldApplySavedSettings()) return;
 
-        // 1. Громкость
+        // 1. Громкость (HD плеер может использовать кастомные слайдеры)
         const volumeSlider = document.querySelector(SELECTORS.volumeSlider);
         if (volumeSlider && config.volume !== undefined && player.volume !== config.volume) {
             player.volume = config.volume;
-            if (volumeSlider.type === 'range') {
+            // Если это стандартный input, обновляем его значение
+            if (volumeSlider.tagName === 'INPUT' && volumeSlider.type === 'range') {
                 volumeSlider.value = config.volume;
+            } else {
+                // Для кастомных слайдеров мы полагаемся на событие volumechange видеоплеера, 
+                // которое уже обрабатывается в setupObservers.
             }
         }
 
-        // 2. Кнопки пропуска
+        // 2. Кнопки пропуска (скрываем/показываем)
         const skipIntroBtn = document.querySelector(SELECTORS.skipIntroBtn);
         if (skipIntroBtn) {
-            skipIntroBtn.style.display = config.skipIntroBtnVisible ? 'block' : 'none';
+            skipIntroBtn.style.setProperty('display', config.skipIntroBtnVisible ? 'block' : 'none', 'important');
         }
 
         const skipCreditsBtn = document.querySelector(SELECTORS.skipCreditsBtn);
         if (skipCreditsBtn) {
-            skipCreditsBtn.style.display = config.skipCreditsBtnVisible ? 'block' : 'none';
+            skipCreditsBtn.style.setProperty('display', config.skipCreditsBtnVisible ? 'block' : 'none', 'important');
         }
 
         console.log('[KP Tweaks] Настройки применены к плееру.');
@@ -157,7 +191,14 @@
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('[KP Tweaks] Настройки открыты по клику');
-                // Здесь можно добавить логику открытия нашего меню или специфических действий
+                // Включаем/выключаем видимость меню настроек или выполняем другие действия
+                const menu = document.getElementById('kp-tweaks-menu');
+                if (menu) {
+                    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+                } else {
+                    // Если меню еще не создано, можно вызвать создание или просто логировать
+                    console.log('[KP Tweaks] Меню настроек не найдено');
+                }
             });
         }
     }
@@ -191,21 +232,23 @@
         document.addEventListener('click', (e) => {
             const target = e.target;
             
-            // Проверка на аудиодорожки
-            if (target.closest(SELECTORS.audioTracks)) {
-                const trackId = target.getAttribute('data-track-id') || target.innerText.trim();
-                if (trackId) {
-                    config.audioTrackId = trackId;
+            // Проверка на аудиодорожки (ищем radio input внутри контейнера или сам input)
+            const audioContainer = target.closest(SELECTORS.audioTracks);
+            if (audioContainer) {
+                const input = audioContainer.querySelector('input[type="radio"]');
+                if (input && input.checked) {
+                    config.audioTrackId = input.value || input.getAttribute('aria-label') || 'Не выбрано';
                     saveConfig();
                     console.log('[KP Tweaks] Сохранена аудиодорожка:', config.audioTrackId);
                 }
             }
 
-            // Проверка на субтитры
-            if (target.closest(SELECTORS.subtitles)) {
-                const subId = target.getAttribute('data-subtitle-id') || target.innerText.trim();
-                if (subId) {
-                    config.subtitlesEnabled = !!subId; 
+            // Проверка на субтитры (ищем radio input внутри контейнера или сам input)
+            const subtitleContainer = target.closest(SELECTORS.subtitles);
+            if (subtitleContainer) {
+                const input = subtitleContainer.querySelector('input[type="radio"]');
+                if (input && input.checked) {
+                    config.subtitlesEnabled = !!input.checked; 
                     saveConfig();
                     console.log('[KP Tweaks] Сохраны настройки субтитров');
                 }
