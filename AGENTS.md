@@ -5,7 +5,7 @@ Development of a Tampermonkey userscript to modify the player on the Kinopoisk H
 Goal: Improve UX by persisting user settings (per-content) and modifying interface behavior.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**Project is STABLE at v2.2.8.**
+**Project is STABLE at v1.0.0**
 All core features implemented and the URL parsing bug is fixed.
 - Volume (global)
 - Audio/Subtitle (per-content, using `rt` param or `pathname`)
@@ -19,7 +19,7 @@ All core features implemented and the URL parsing bug is fixed.
 *   **Testing:** Manual DOM inspection via Chrome DevTools.
 
 ## 📂 Project Structure
-*   `kinopoisk-tweaks.user.js` - main userscript (v2.2.8).
+*   `kinopoisk-tweaks.user.js` - main userscript (v1.0.0).
 *   `AGENTS.md` - this file.
 
 ## 🎯 Core Tasks (Feature Roadmap)
@@ -49,5 +49,5 @@ All core features implemented and the URL parsing bug is fixed.
 *   Do NOT run `git push`. Only `git add` and `git commit`.
 
 ## 📝 Current Status
-*   [x] Stable v2.2.8 committed.
+*   [x] Stable v1.0.0 committed.
 *   [!] Known Issue: None.

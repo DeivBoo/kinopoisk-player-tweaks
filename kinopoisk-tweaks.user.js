@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
 // @namespace    https://github.com/DeivBoo/kinopoisk-player-tweaks
-// @version      2.2.8
+// @version      1.0.0
 // @description  Улучшение плеера Кинопоиска: сохранение состояния громкости, субтитров и аудиодорожек, управление кнопками пропуска и меню настроек.
 // @author       DeivBoo
 // @match        https://hd.kinopoisk.ru/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @downloadURL  https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js
+// @updateURL    https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js
 // ==/UserScript==
 
 (function() {
@@ -27,7 +30,7 @@
     };
     // ==========================================
 
-    console.log('[KP Tweaks] Скрипт v2.2.8 запущен.');
+    console.log('[KP Tweaks] Скрипт v1.0.0 запущен.');
 
     const getVal = (key, defaultVal) => {
         try { return typeof GM_getValue === 'function' ? GM_getValue(key, defaultVal) : defaultVal; }
