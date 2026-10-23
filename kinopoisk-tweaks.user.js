@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
 // @namespace    http://tampermonkey.net/
-// @version      2.2.6
-// @description  Сохранение настроек и управление меню
+// @version      2.2.8
+// @description  Сохранение настроек и управление меню (Fixed URL parsing)
 // @author       DeivBoo
 // @match        https://hd.kinopoisk.ru/*
 // @grant        GM_setValue
@@ -27,7 +27,7 @@
     };
     // ==========================================
 
-    console.log('[KP Tweaks] Скрипт v2.2.6 запущен.');
+    console.log('[KP Tweaks] Скрипт v2.2.8 запущен.');
 
     const getVal = (key, defaultVal) => {
         try { return typeof GM_getValue === 'function' ? GM_getValue(key, defaultVal) : defaultVal; }
@@ -37,23 +37,54 @@
         try { if (typeof GM_setValue === 'function') GM_setValue(key, val); } catch {}
     };
 
+    // ==========================================
+    // КОНТЕНТ-СПЕЦИФИЧНЫЕ НАСТРОЙКИ
+    // ==========================================
+    function getContentId() {
+        // 1. Проверяем наличие параметра 'rt' (он появляется при переходе с чужой промо-страницы)
+        const params = new URLSearchParams(window.location.search);
+        const rt = params.get('rt');
+        if (rt) return rt;
+
+        // 2. Если 'rt' нет, берем ID из пути (для своей промо-страницы)
+        const match = window.location.pathname.match(/\/(?:film|series)\/([a-f0-9]+)/i);
+        return match ? match[1] : 'default';
+    }
+
     const defaultVolumeNormalized = USER_CONFIG.defaultVolume / 100;
 
+    // Одноразовая миграция старых глобальных ключей в per-content формат
+    (function migrateLegacy() {
+        const contentId = getContentId();
+        if (contentId === 'default') return;
+
+        const legacyAudio = getVal('audioTrackLabel', null);
+        const legacySub = getVal('subtitleLabel', null);
+
+        if (legacyAudio && legacyAudio.startsWith('Аудио')) {
+            setVal(`audioTrackLabel_${contentId}`, legacyAudio);
+            setVal('audioTrackLabel', null);
+            console.log(`[KP Tweaks] Миграция аудио -> ${contentId}`);
+        }
+        if (legacySub && legacySub.startsWith('Субтитры')) {
+            setVal(`subtitleLabel_${contentId}`, legacySub);
+            setVal('subtitleLabel', null);
+            console.log(`[KP Tweaks] Миграция субтитров -> ${contentId}`);
+        }
+    })();
+
     let config = {
-        volume: getVal('volume', defaultVolumeNormalized),
-        audioTrackLabel: getVal('audioTrackLabel', null),
-        subtitleLabel: getVal('subtitleLabel', null)
+        volume: getVal('volume', defaultVolumeNormalized), // Громкость — глобальная
+        audioTrackLabel: getVal(`audioTrackLabel_${getContentId()}`, null), // Аудио — per-content
+        subtitleLabel: getVal(`subtitleLabel_${getContentId()}`, null)      // Субтитры — per-content
     };
 
     if (config.volume > 1) config.volume = config.volume / 100;
 
-    if (config.audioTrackLabel && !config.audioTrackLabel.startsWith('Аудио')) {
-        if (config.audioTrackLabel.startsWith('Субтитры')) {
-            config.subtitleLabel = config.audioTrackLabel;
-            setVal('subtitleLabel', config.audioTrackLabel);
-        }
-        config.audioTrackLabel = null;
-        setVal('audioTrackLabel', null);
+    function loadContentConfig() {
+        const contentId = getContentId();
+        config.audioTrackLabel = getVal(`audioTrackLabel_${contentId}`, null);
+        config.subtitleLabel = getVal(`subtitleLabel_${contentId}`, null);
     }
 
     const SELECTORS = {
@@ -69,8 +100,12 @@
     let videoElement = null;
     let restoreAttempts = 0;
     let isRestoring = false;
+    let lastContentId = getContentId();
 
     function initVolume(video) {
+        if (video.dataset.kpTweaksVolumeInit) return;
+        video.dataset.kpTweaksVolumeInit = 'true';
+
         if (video.volume !== config.volume) video.volume = config.volume;
         video.addEventListener('volumechange', () => {
             if (video.volume !== config.volume) {
@@ -85,18 +120,19 @@
         if (input && input.checked) {
             const label = input.getAttribute('aria-label');
             if (!label) return;
+            const contentId = getContentId();
 
             if (label.startsWith('Аудио')) {
                 if (config.audioTrackLabel !== label) {
                     config.audioTrackLabel = label;
-                    setVal('audioTrackLabel', label);
-                    console.log(`[KP Tweaks] Сохранено аудио: ${label}`);
+                    setVal(`audioTrackLabel_${contentId}`, label);
+                    console.log(`[KP Tweaks] Сохранено аудио [${contentId}]: ${label}`);
                 }
             } else if (label.startsWith('Субтитры')) {
                 if (config.subtitleLabel !== label) {
                     config.subtitleLabel = label;
-                    setVal('subtitleLabel', label);
-                    console.log(`[KP Tweaks] Сохранены субтитры: ${label}`);
+                    setVal(`subtitleLabel_${contentId}`, label);
+                    console.log(`[KP Tweaks] Сохранены субтитры [${contentId}]: ${label}`);
                 }
             }
         }
@@ -170,13 +206,11 @@
             const isSkip = text.includes('Пропустить');
 
             if (USER_CONFIG.autoSkip === 3) {
-                // 3: Ничего не скрывать и не нажимать
                 btn.style.display = '';
                 return;
             }
 
             if (USER_CONFIG.autoSkip === 1) {
-                // 1: АВТО-ПРОПУСК
                 if (isSkip) {
                     if (!btn.dataset.kpTweaksClicked) {
                         btn.dataset.kpTweaksClicked = 'true';
@@ -187,16 +221,15 @@
                     btn.style.display = 'none';
                 }
             } else if (USER_CONFIG.autoSkip === 2) {
-                // 2: РЕЖИМ ПРОСМОТРА
                 if (isWatch) {
                     if (!btn.dataset.kpTweaksClicked) {
                         btn.dataset.kpTweaksClicked = 'true';
                         console.log(`[KP Tweaks] Режим просмотра: нажимаем "${text}" для остановки таймера`);
                         btn.click();
                     }
-                    btn.style.display = 'none'; // Прячем кнопку "Смотреть"
+                    btn.style.display = 'none';
                 } else if (isSkip) {
-                    btn.style.display = 'none'; // Прячем кнопку "Пропустить"
+                    btn.style.display = 'none';
                 }
             }
         });
@@ -250,6 +283,24 @@
     document.addEventListener('click', saveTracks, true);
 
     const monitor = setInterval(() => {
+        // ДЕТЕКТОР SPA-НАВИГАЦИИ
+        const nowContentId = getContentId();
+        if (nowContentId !== lastContentId) {
+            console.log(`[KP Tweaks] Смена контента: ${lastContentId} -> ${nowContentId}`);
+            lastContentId = nowContentId;
+
+            // Загружаем настройки для нового контента
+            loadContentConfig();
+
+            // Сбрасываем состояние восстановления
+            videoElement = null;
+            restoreAttempts = 0;
+            isRestoring = false;
+
+            // Удаляем старые оверлеи (они привязаны к устаревшим кнопкам)
+            document.querySelectorAll('[id^="kp-overlay-"]').forEach(el => el.remove());
+        }
+
         if (!videoElement) {
             videoElement = document.querySelector(SELECTORS.video);
             if (videoElement) {
