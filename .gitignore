@@ -1,4 +1,9 @@
 .env
 *.log
 .DS_Store
+
+# Игнорировать скриншоты и картинки, созданные агентом
+*.png
+*.jpg
+*.jpeg
 Screenshots/

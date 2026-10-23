@@ -2,53 +2,44 @@
 
 ## 🎯 About the Project
 Development of a Tampermonkey userscript to modify the player on the Kinopoisk website (kinopoisk.ru). 
-Goal: Improve UX by persisting user settings and modifying interface behavior safely without breaking the React-based player.
+Goal: Improve UX by persisting user settings and modifying interface behavior without breaking the React-based player.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**Research Phase: Finding exact selectors for player controls.**
-We recently rolled back to a stable version (v1.6) that ONLY handles volume persistence. The previous attempts to blindly implement recursive shadow DOM traversal and aggressive event interception broke the player. 
-Your immediate goal is to use Playwright MCP to **inspect the live page, find the exact paths to the audio track menu and skip buttons**, and provide a list of reliable selectors before writing any injection code.
+**Project is stable at v1.9.**
+All core features are working: Volume, Audio/Subtitle persistence, and Hiding Skip Buttons. 
+The **ONLY** remaining task is implementing the "Hover-to-Click" behavior for the settings and audio menus. Previous attempts using `stopPropagation` on `mouseenter` failed due to React's event delegation. We need a new strategy.
 
 ## 🛠 Tech Stack
 *   **Environment:** WSL 2 (Ubuntu 26.04), Bionic (LM Studio), Playwright MCP.
 *   **Language:** JavaScript (ES6+).
-*   **Script Manager:** Tampermonkey (using `GM_setValue`, `GM_getValue` APIs).
-*   **Testing:** Playwright (available via MCP). Runs in `--headed` mode for visual monitoring.
+*   **Script Manager:** Tampermonkey (`GM_setValue`, `GM_getValue`).
+*   **Testing:** Manual DOM inspection via Chrome DevTools + Playwright.
 
 ## 📂 Project Structure
-*   `kinopoisk-tweaks.user.js` - main userscript file.
-*   `AGENTS.md` - this file (context for AI).
-*   `.gitignore` - Git exclusions.
-*   `Screenshots` - folder for saving screenshots.
+*   `kinopoisk-tweaks.user.js` - main userscript (v1.9).
+*   `AGENTS.md` - this file.
 
 ## 🎯 Core Tasks (Feature Roadmap)
-1.  [x] **Volume Persistence (STABLE):** Remember the volume level when closing the page and restore it upon reopening. (Implemented in v1.6 via simple `setInterval`).
-2.  [ ] **Audio Track Persistence (PAUSED):** Remember the selected voiceover. *Requires exact selectors from Playwright.*
-3.  [ ] **Skip Buttons (PAUSED):** Toggle "Skip Intro" and "Skip Credits" buttons. *Requires exact selectors from Playwright.*
-4.  [ ] **Menu Behavior Change (PAUSED):** Replace hover with click. *Highly risky. Do not attempt until we understand the React event flow.*
-5.  [ ] **Shadow DOM Traversal (RESEARCH):** Implement a targeted search, NOT a global recursive search over all nodes.
+1.  [x] **Volume Persistence:** Remember volume (implemented via `volumechange` listener).
+2.  [x] **Audio/Subtitle Persistence:** Remember selected audio via `aria-label` and restore it using a retry mechanism (up to 5 attempts).
+3.  [x] **Skip Buttons:** Hide all buttons with text "Пропустить", "Смотреть заставку", "Смотреть титры".
+4.  [ ] **Menu Behavior Change (HOVER TO CLICK):** Replace hover with click on the settings and audio buttons. **CURRENT BLOCKER.**
 
 ## ⚙️ Technical Implementation Details
-*   **Persistence Mechanism:** Simple `GM_getValue`/`GM_setValue` for volume. 
-*   **Player Detection:** We use a simple `setInterval` (every 1s) to find the `<video>` tag. We explicitly **DO NOT** use a heavy `MutationObserver` on `document.body` as it causes infinite loops and freezes the player.
+*   **Selectors:** Only use stable attributes (`data-test-id`, `data-tid`, `aria-label`). Do NOT use hashed React classes (e.g., `styles_button__2DDkK`).
+*   **Timing:** React menus take time to render. Use `setTimeout` with retries for DOM interactions.
+*   **State:** Config object is saved in `GM_setValue`.
 
-## ⚠️ Technical Constraints and Rules (CRITICAL - READ BEFORE CODING)
-1.  **NO GLOBAL RECURSIVE SEARCH:** Do not write a function that loops through every element and every `shadowRoot` on the page. It will crash the browser. If you need to traverse Shadow DOM, you must find the *specific container* first and only search within its shadow root.
-2.  **NO AGGRESSIVE EVENT OVERRIDES:** Do not use `e.stopPropagation()` on `mouseover` or `click` events globally. This breaks the site's internal state.
-3.  **SPA Nature:** The player loads asynchronously. Wait for elements to appear gracefully without freezing the main thread.
-4.  **Security:** Do not use `innerHTML` for inserting user-provided data.
-5.  **Testing/Research:** Use `browser_evaluate` primarily to **extract information** (e.g., "find the audio menu and return its outerHTML"), not to inject logic yet.
+## ⚠️ Technical Constraints and Rules (CRITICAL)
+1.  **NO GLOBAL MUTATION OBSERVERS:** Do not observe `document.body`. Use `setInterval` for polling (every 1s) to find elements.
+2.  **NO RECURSIVE DOM SEARCH:** Do not write deep Shadow DOM traversal functions. Use known stable selectors.
+3.  **DO NOT BREAK REACT:** Avoid injecting scripts into React's internal state. Use standard DOM events (click).
+4.  **NO BLIND EVENT OVERRIDES:** Do not use `e.stopImmediatePropagation()` on global `mouseover` without understanding React's synthetic event system.
+5. **Screenshots:** If you need to take a screenshot via Playwright, ALWAYS save it to the `Screenshots/` directory (e.g., `Screenshots/debug.png`). NEVER save images directly to the project root.
 
 ## 🛑 Git Workflow Rules
-*   **DO NOT** run `git commit`, `git push`, or `git reset` automatically. 
-*   You may suggest a commit message, but the user must execute the final git commands manually.
-
-## 🔄 Agent Communication & Handoff
-When reaching context limits or completing a significant milestone, provide a structured handoff summary.
+*   Do NOT run `git push`. Only `git add` and `git commit`.
 
 ## 📝 Current Status
-*   [x] Git and SSH configured.
-*   [x] Playwright MCP configured.
-*   [x] Rollback to stable v1.6 (Volume only).
-*   [ ] Research audio track and skip button selectors (IN PROGRESS).
-*   [!] **WARNING:** Previous complex scripts broke the player. Do not over-engineer. Keep it simple. Test one selector at a time.
+*   [x] Stable v1.9 committed.
+*   [!] Known Issue: Hover-to-click on menu buttons is not implemented. React event delegation ignores standard `mouseenter` blocking.
