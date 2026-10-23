@@ -1,10 +1,9 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
 // @namespace    http://tampermonkey.net/
-// @version      2.2.0
-// @description  Сохранение настроек и управление меню (Stable Restore)
+// @version      2.2.6
+// @description  Сохранение настроек и управление меню
 // @author       DeivBoo
-// @match        https://www.kinopoisk.ru/*
 // @match        https://hd.kinopoisk.ru/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -13,7 +12,22 @@
 (function() {
     'use strict';
 
-    console.log('[KP Tweaks] Скрипт v2.2.0 запущен.');
+    // ==========================================
+    // ⚙️ НАСТРОЙКИ (Редактируйте под себя)
+    // ==========================================
+    const USER_CONFIG = {
+        // Стандартная громкость (от 0 до 100).
+        defaultVolume: 100,
+
+        // Управление кнопками пропуска:
+        // 1 - Авто-пропуск (клик по "Пропустить", скрытие "Смотреть заставку/титры")
+        // 2 - Режим просмотра (клик по "Смотреть заставку/титры" для остановки таймера, скрытие "Пропустить")
+        // 3 - Ничего не скрывать и не нажимать
+        autoSkip: 2,
+    };
+    // ==========================================
+
+    console.log('[KP Tweaks] Скрипт v2.2.6 запущен.');
 
     const getVal = (key, defaultVal) => {
         try { return typeof GM_getValue === 'function' ? GM_getValue(key, defaultVal) : defaultVal; }
@@ -23,15 +37,16 @@
         try { if (typeof GM_setValue === 'function') GM_setValue(key, val); } catch {}
     };
 
+    const defaultVolumeNormalized = USER_CONFIG.defaultVolume / 100;
+
     let config = {
-        volume: getVal('volume', 0.5),
+        volume: getVal('volume', defaultVolumeNormalized),
         audioTrackLabel: getVal('audioTrackLabel', null),
-        subtitleLabel: getVal('subtitleLabel', null),
-        hideIntro: getVal('hideIntro', true),
-        hideCredits: getVal('hideCredits', true)
+        subtitleLabel: getVal('subtitleLabel', null)
     };
 
-    // Миграция данных
+    if (config.volume > 1) config.volume = config.volume / 100;
+
     if (config.audioTrackLabel && !config.audioTrackLabel.startsWith('Аудио')) {
         if (config.audioTrackLabel.startsWith('Субтитры')) {
             config.subtitleLabel = config.audioTrackLabel;
@@ -53,7 +68,7 @@
 
     let videoElement = null;
     let restoreAttempts = 0;
-    let isRestoring = false; // Защита от двойного запуска
+    let isRestoring = false;
 
     function initVolume(video) {
         if (video.volume !== config.volume) video.volume = config.volume;
@@ -101,19 +116,15 @@
             return;
         }
 
-        console.log('[KP Tweaks] Начинаем восстановление. Меню закрыто?', audioBtn.getAttribute('aria-expanded') === 'false');
+        console.log('[KP Tweaks] Начинаем восстановление.');
 
-        // Ждем немного, чтобы интерфейс точно прогрузился
         setTimeout(() => {
             const btn = document.querySelector(SELECTORS.audioBtn);
-            // Открываем меню только если оно закрыто
             if (btn && btn.getAttribute('aria-expanded') !== 'true') {
                 btn.click();
             }
 
-            // Ждем открытия меню
             setTimeout(() => {
-                // 1. ВЫСТАВЛЯЕМ АУДИО
                 if (config.audioTrackLabel) {
                     const inputs = Array.from(document.querySelectorAll(SELECTORS.audioInputs));
                     const target = inputs.find(i => i.getAttribute('aria-label') === config.audioTrackLabel);
@@ -123,9 +134,7 @@
                     }
                 }
 
-                // Пауза, чтобы плеер переварил аудио
                 setTimeout(() => {
-                    // 2. ВЫСТАВЛЯЕМ СУБТИТРЫ
                     if (config.subtitleLabel) {
                         const inputs = Array.from(document.querySelectorAll(SELECTORS.audioInputs));
                         const target = inputs.find(i => i.getAttribute('aria-label') === config.subtitleLabel);
@@ -135,27 +144,60 @@
                         }
                     }
 
-                    // 3. ЗАКРЫВАЕМ МЕНЮ
                     setTimeout(() => {
                         const btn = document.querySelector(SELECTORS.audioBtn);
                         if (btn && btn.getAttribute('aria-expanded') === 'true') {
                             btn.click();
                         }
-                        isRestoring = false; // Разрешаем будущие запуски, если нужно
+                        isRestoring = false;
                         console.log('[KP Tweaks] Восстановление завершено.');
                     }, 300);
 
                 }, 500);
             }, 400);
-        }, 500); // Задержка перед стартом, чтобы React успокоился
+        }, 500);
     }
 
+    // ==========================================
+    // ЛОГИКА КНОПОК ПРОПУСКА
+    // ==========================================
     function handleSkipButtons() {
         const buttons = document.querySelectorAll(SELECTORS.skipBtn);
         buttons.forEach(btn => {
             const text = btn.innerText.trim();
-            if (text.includes('Пропустить') || text.includes('Смотреть заставку') || text.includes('Смотреть титры')) {
-                if (config.hideIntro) btn.style.display = 'none';
+
+            const isWatch = text.includes('Смотреть заставку') || text.includes('Смотреть титры');
+            const isSkip = text.includes('Пропустить');
+
+            if (USER_CONFIG.autoSkip === 3) {
+                // 3: Ничего не скрывать и не нажимать
+                btn.style.display = '';
+                return;
+            }
+
+            if (USER_CONFIG.autoSkip === 1) {
+                // 1: АВТО-ПРОПУСК
+                if (isSkip) {
+                    if (!btn.dataset.kpTweaksClicked) {
+                        btn.dataset.kpTweaksClicked = 'true';
+                        console.log(`[KP Tweaks] Авто-пропуск: ${text}`);
+                        btn.click();
+                    }
+                } else if (isWatch) {
+                    btn.style.display = 'none';
+                }
+            } else if (USER_CONFIG.autoSkip === 2) {
+                // 2: РЕЖИМ ПРОСМОТРА
+                if (isWatch) {
+                    if (!btn.dataset.kpTweaksClicked) {
+                        btn.dataset.kpTweaksClicked = 'true';
+                        console.log(`[KP Tweaks] Режим просмотра: нажимаем "${text}" для остановки таймера`);
+                        btn.click();
+                    }
+                    btn.style.display = 'none'; // Прячем кнопку "Смотреть"
+                } else if (isSkip) {
+                    btn.style.display = 'none'; // Прячем кнопку "Пропустить"
+                }
             }
         });
     }
@@ -196,7 +238,6 @@
                 overlay.style.width = rect.width + 'px';
                 overlay.style.height = rect.height + 'px';
 
-                // Умное поведение (не пропускает клики)
                 if (btn.getAttribute('aria-expanded') === 'true') {
                     overlay.style.pointerEvents = 'none';
                 } else {
@@ -214,7 +255,7 @@
             if (videoElement) {
                 console.log('[KP Tweaks] Видео найдено.');
                 initVolume(videoElement);
-                setTimeout(restoreTracks, 700); // Даем плееру время на полную инициализацию
+                setTimeout(restoreTracks, 700);
             }
         }
         handleSkipButtons();
@@ -230,6 +271,6 @@
 
         const sendBtn = document.querySelector(SELECTORS.sendBtn);
         if (sendBtn) createOverlay(sendBtn, 'send');
-    }, 1000);
+    }, 500);
 
 })();
