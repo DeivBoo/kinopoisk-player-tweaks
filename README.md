@@ -6,7 +6,7 @@ A Tampermonkey userscript designed to enhance the viewing experience on Kinopois
 
 *   🔊 **Volume Persistence:** Remembers your volume level across sessions and restores it when you return.
 *   🗣️ **Audio Track Persistence:** Saves your selected voiceover/language and applies it automatically.
-*   ⏭️ **Skip Buttons Control:** Toggle the visibility of "Skip Intro" and "Skip Credits" buttons.
+*   ⏭️ **Skip Buttons Control:** Automatically clicks the "Skip" or "Watch" buttons for intros and credits (can be toggled on/off).
 *   🖱️ **Menu Behavior Change:** Replaces the annoying hover-based settings menu with a standard click interaction.
 *   🛠️ **Custom Settings Menu:** Provides a sleek, built-in UI to manage your preferences manually.
 
@@ -36,8 +36,8 @@ This project was developed using a modern, AI-assisted workflow:
 
 Пользовательский скрипт для Tampermonkey, улучшающий работу плеера на Кинопоиске.
 Основные функции:
-*   Сохранение уровня громкости и выбранной аудиодорожки.
-*   Управление видимостью кнопок «Пропустить заставку/титры».
+*   Сохранение уровня громкости, выбранной аудиодорожки и выставленных субтитров.
+*   Автоматическое нажатие кнопок пропуска или просмотра заставки/титров (функцию можно включить или выключить).
 *   Изменение поведения меню настроек (открытие по клику вместо наведения).
 
 **Установка:** Установите Tampermonkey, нажмите на ссылку для установки скрипта (см. выше) и подтвердите установку.
