@@ -14,7 +14,7 @@ A Tampermonkey userscript designed to enhance the viewing experience on Kinopois
 
 1.  Install the **Tampermonkey** extension for your browser ([Chrome](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo), [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/), etc.).
 2.  Click on the link below to install the script:
-    *   **[Install Kinopoisk Player Tweaks](https://github.com/DeivBoo/kp-extension/main/kinopoisk-tweaks.user.js)**
+    *   **[Install Kinopoisk Player Tweaks](https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js)**
 3.  Tampermonkey will prompt you to install. Click "Install".
 4.  Open any movie or series on Kinopoisk and enjoy!
 

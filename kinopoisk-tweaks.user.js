@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
-// @namespace    http://tampermonkey.net/
+// @namespace    https://github.com/DeivBoo/kinopoisk-player-tweaks
 // @version      2.2.8
-// @description  Сохранение настроек и управление меню (Fixed URL parsing)
+// @description  Улучшение плеера Кинопоиска: сохранение состояния громкости, субтитров и аудиодорожек, управление кнопками пропуска и меню настроек.
 // @author       DeivBoo
 // @match        https://hd.kinopoisk.ru/*
 // @grant        GM_setValue
