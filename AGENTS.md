@@ -5,9 +5,10 @@ Development of a Tampermonkey userscript to modify the player on the Kinopoisk w
 Goal: Improve UX by persisting user settings and modifying interface behavior without breaking the React-based player.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**Project is stable at v1.9.**
-All core features are working: Volume, Audio/Subtitle persistence, and Hiding Skip Buttons. 
-The **ONLY** remaining task is implementing the "Hover-to-Click" behavior for the settings and audio menus. Previous attempts using `stopPropagation` on `mouseenter` failed due to React's event delegation. We need a new strategy.
+**Project is stable at v2.1.4.** 
+All core features are fully implemented and working! The "Smart Overlay" successfully handles Hover-to-Click and Toggle (open/close) behavior for Settings, Audio, Seasons, and Send-to-device buttons. The Volume button is intentionally left untouched (native behavior) to prevent UI breaking.
+
+Next steps: Address remaining UX nuances requested by the user (to be defined) or implement Subtitle persistence.
 
 ## 🛠 Tech Stack
 *   **Environment:** WSL 2 (Ubuntu 26.04), Bionic (LM Studio), Playwright MCP.
@@ -16,30 +17,35 @@ The **ONLY** remaining task is implementing the "Hover-to-Click" behavior for th
 *   **Testing:** Manual DOM inspection via Chrome DevTools + Playwright.
 
 ## 📂 Project Structure
-*   `kinopoisk-tweaks.user.js` - main userscript (v1.9).
+*   `kinopoisk-tweaks.user.js` - main userscript (v2.1.4).
 *   `AGENTS.md` - this file.
 
 ## 🎯 Core Tasks (Feature Roadmap)
-1.  [x] **Volume Persistence:** Remember volume (implemented via `volumechange` listener).
-2.  [x] **Audio/Subtitle Persistence:** Remember selected audio via `aria-label` and restore it using a retry mechanism (up to 5 attempts).
-3.  [x] **Skip Buttons:** Hide all buttons with text "Пропустить", "Смотреть заставку", "Смотреть титры".
-4.  [ ] **Menu Behavior Change (HOVER TO CLICK):** Replace hover with click on the settings and audio buttons. **CURRENT BLOCKER.**
+1.  [x] **Volume Persistence:** Remember volume.
+2.  [x] **Audio Track Persistence:** Remember and restore audio track.
+3.  [x] **Skip Buttons:** Hide "Skip Intro/Credits" buttons.
+4.  [x] **Menu Behavior Change (Hover-to-Click):** Implemented via the "Smart Overlay" trick for 4 main buttons.
+5.  [ ] **Subtitle Persistence:** Remember and restore subtitles.
+6.  [ ] **Settings UI:** Add a native Tampermonkey menu to toggle `hideIntro` and `hideCredits` flags.
 
 ## ⚙️ Technical Implementation Details
-*   **Selectors:** Only use stable attributes (`data-test-id`, `data-tid`, `aria-label`). Do NOT use hashed React classes (e.g., `styles_button__2DDkK`).
+*   **The "Smart Overlay" Trick:** 
+    *   We inject a transparent `div` over the target button to intercept and block `mouseover`/`mouseenter` events (preventing the menu from opening on hover).
+    *   **Crucial detail for Toggle behavior:** We check the `aria-expanded` attribute of the underlying button every 100ms. 
+    *   If `aria-expanded="true"` (menu is open), we set `overlay.style.pointerEvents = 'none'`. This allows the *second* click to pass through the overlay directly to the button, allowing React to close the menu naturally.
+    *   If `aria-expanded="false"` (menu is closed), we set `pointerEvents = 'auto'` to block hover again.
+*   **Selectors:** Only use stable attributes (`data-test-id`, `data-tid`, `aria-label`, or stable class prefixes).
 *   **Timing:** React menus take time to render. Use `setTimeout` with retries for DOM interactions.
-*   **State:** Config object is saved in `GM_setValue`.
 
 ## ⚠️ Technical Constraints and Rules (CRITICAL)
-1.  **NO GLOBAL MUTATION OBSERVERS:** Do not observe `document.body`. Use `setInterval` for polling (every 1s) to find elements.
-2.  **NO RECURSIVE DOM SEARCH:** Do not write deep Shadow DOM traversal functions. Use known stable selectors.
-3.  **DO NOT BREAK REACT:** Avoid injecting scripts into React's internal state. Use standard DOM events (click).
-4.  **NO BLIND EVENT OVERRIDES:** Do not use `e.stopImmediatePropagation()` on global `mouseover` without understanding React's synthetic event system.
-5. **Screenshots:** If you need to take a screenshot via Playwright, ALWAYS save it to the `Screenshots/` directory (e.g., `Screenshots/debug.png`). NEVER save images directly to the project root.
+1.  **NO GLOBAL MUTATION OBSERVERS:** Use `setInterval` for polling.
+2.  **NO RECURSIVE DOM SEARCH:** Use known stable selectors.
+3.  **DO NOT BLOCK VOLUME HOVER:** The volume button is a complex container. Blocking hover on it breaks the UI (it just mutes/unmutes instead of showing the slider). Leave it native.
+4.  **NO BLIND EVENT OVERRIDES:** Do not try to `stopPropagation()` on `mouseenter/mouseover` globally or manually dispatch sequences of `mousedown`/`mouseup` in a way that breaks React's state. Use the Overlay trick.
 
 ## 🛑 Git Workflow Rules
 *   Do NOT run `git push`. Only `git add` and `git commit`.
 
 ## 📝 Current Status
-*   [x] Stable v1.9 committed.
-*   [!] Known Issue: Hover-to-click on menu buttons is not implemented. React event delegation ignores standard `mouseenter` blocking.
+*   [x] Stable v2.1.4 committed.
+*   [!] Known Issue: Toggle behavior requires a 100ms tick to update `pointer-events`, which is imperceptible to the user but technically asynchronous.
