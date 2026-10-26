@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
 // @namespace    https://github.com/DeivBoo/kinopoisk-player-tweaks
-// @version      1.0.0
+// @version      1.0.1
 // @description  Улучшение плеера Кинопоиска: сохранение состояния громкости, субтитров и аудиодорожек, управление кнопками пропуска и меню настроек.
 // @author       DeivBoo
 // @match        https://hd.kinopoisk.ru/*
@@ -19,14 +19,40 @@
     // ⚙️ НАСТРОЙКИ (Редактируйте под себя)
     // ==========================================
     const USER_CONFIG = {
+        // --- Переключатели функций (true - вкл, false - выкл) ---
+
+        // Сохранять и восстанавливать уровень громкости
+        enableVolumePersistence: true,
+
+        // Сохранять и восстанавливать аудиодорожки и субтитры
+        enableTrackPersistence: true,
+
+        // Умные панели: открывать меню настроек по клику, а не при наведении
+        enableHoverToClick: true,
+
+        // --- Дополнительные настройки ---
+
         // Стандартная громкость (от 0 до 100).
+        // Работает при включенном enableVolumePersistence
+        // и отсутствии данных о ранее выставленной громкости
         defaultVolume: 100,
 
-        // Управление кнопками пропуска:
-        // 1 - Авто-пропуск (клик по "Пропустить", скрытие "Смотреть заставку/титры")
-        // 2 - Режим просмотра (клик по "Смотреть заставку/титры" для остановки таймера, скрытие "Пропустить")
+        // Управление заставкой (вступлением):
+        // 1 - Авто-пропуск (клик "Пропустить", скрытие "Смотреть заставку")
+        // 2 - Режим просмотра (клик "Смотреть заставку", скрытие "Пропустить")
         // 3 - Ничего не скрывать и не нажимать
-        autoSkip: 2,
+        skipIntroAction: 2,
+
+        // Управление титрами:
+        // 1 - Авто-пропуск (клик "Пропустить", скрытие "Смотреть титры")
+        // 2 - Режим просмотра (клик "Смотреть титры", скрытие "Пропустить")
+        // 3 - Ничего не скрывать и не нажимать
+        skipCreditsAction: 2,
+
+        // Управление рекламой (перед видео):
+        // 1 - Авто-пропуск (клик "Пропустить", скрытие "Буду смотреть")
+        // 2 - Ничего не делать (кнопки остаются как есть)
+        skipAdAction: 1,
     };
     // ==========================================
 
@@ -44,19 +70,16 @@
     // КОНТЕНТ-СПЕЦИФИЧНЫЕ НАСТРОЙКИ
     // ==========================================
     function getContentId() {
-        // 1. Проверяем наличие параметра 'rt' (он появляется при переходе с чужой промо-страницы)
         const params = new URLSearchParams(window.location.search);
         const rt = params.get('rt');
         if (rt) return rt;
 
-        // 2. Если 'rt' нет, берем ID из пути (для своей промо-страницы)
         const match = window.location.pathname.match(/\/(?:film|series)\/([a-f0-9]+)/i);
         return match ? match[1] : 'default';
     }
 
     const defaultVolumeNormalized = USER_CONFIG.defaultVolume / 100;
 
-    // Одноразовая миграция старых глобальных ключей в per-content формат
     (function migrateLegacy() {
         const contentId = getContentId();
         if (contentId === 'default') return;
@@ -67,19 +90,17 @@
         if (legacyAudio && legacyAudio.startsWith('Аудио')) {
             setVal(`audioTrackLabel_${contentId}`, legacyAudio);
             setVal('audioTrackLabel', null);
-            console.log(`[KP Tweaks] Миграция аудио -> ${contentId}`);
         }
         if (legacySub && legacySub.startsWith('Субтитры')) {
             setVal(`subtitleLabel_${contentId}`, legacySub);
             setVal('subtitleLabel', null);
-            console.log(`[KP Tweaks] Миграция субтитров -> ${contentId}`);
         }
     })();
 
     let config = {
-        volume: getVal('volume', defaultVolumeNormalized), // Громкость — глобальная
-        audioTrackLabel: getVal(`audioTrackLabel_${getContentId()}`, null), // Аудио — per-content
-        subtitleLabel: getVal(`subtitleLabel_${getContentId()}`, null)      // Субтитры — per-content
+        volume: getVal('volume', defaultVolumeNormalized),
+        audioTrackLabel: getVal(`audioTrackLabel_${getContentId()}`, null),
+        subtitleLabel: getVal(`subtitleLabel_${getContentId()}`, null)
     };
 
     if (config.volume > 1) config.volume = config.volume / 100;
@@ -106,6 +127,7 @@
     let lastContentId = getContentId();
 
     function initVolume(video) {
+        if (!USER_CONFIG.enableVolumePersistence) return;
         if (video.dataset.kpTweaksVolumeInit) return;
         video.dataset.kpTweaksVolumeInit = 'true';
 
@@ -119,6 +141,8 @@
     }
 
     function saveTracks(e) {
+        if (!USER_CONFIG.enableTrackPersistence) return;
+
         const input = e.target.closest('div[data-test-id="settings-item"]')?.querySelector('input[type="radio"]');
         if (input && input.checked) {
             const label = input.getAttribute('aria-label');
@@ -129,19 +153,18 @@
                 if (config.audioTrackLabel !== label) {
                     config.audioTrackLabel = label;
                     setVal(`audioTrackLabel_${contentId}`, label);
-                    console.log(`[KP Tweaks] Сохранено аудио [${contentId}]: ${label}`);
                 }
             } else if (label.startsWith('Субтитры')) {
                 if (config.subtitleLabel !== label) {
                     config.subtitleLabel = label;
                     setVal(`subtitleLabel_${contentId}`, label);
-                    console.log(`[KP Tweaks] Сохранены субтитры [${contentId}]: ${label}`);
                 }
             }
         }
     }
 
     function restoreTracks() {
+        if (!USER_CONFIG.enableTrackPersistence) return;
         if (isRestoring || restoreAttempts >= 5) return;
         if (!config.audioTrackLabel && !config.subtitleLabel) return;
 
@@ -155,8 +178,6 @@
             return;
         }
 
-        console.log('[KP Tweaks] Начинаем восстановление.');
-
         setTimeout(() => {
             const btn = document.querySelector(SELECTORS.audioBtn);
             if (btn && btn.getAttribute('aria-expanded') !== 'true') {
@@ -167,20 +188,14 @@
                 if (config.audioTrackLabel) {
                     const inputs = Array.from(document.querySelectorAll(SELECTORS.audioInputs));
                     const target = inputs.find(i => i.getAttribute('aria-label') === config.audioTrackLabel);
-                    if (target && !target.checked) {
-                        console.log(`[KP Tweaks] Устанавливаем аудио: ${config.audioTrackLabel}`);
-                        target.click();
-                    }
+                    if (target && !target.checked) target.click();
                 }
 
                 setTimeout(() => {
                     if (config.subtitleLabel) {
                         const inputs = Array.from(document.querySelectorAll(SELECTORS.audioInputs));
                         const target = inputs.find(i => i.getAttribute('aria-label') === config.subtitleLabel);
-                        if (target) {
-                            console.log(`[KP Tweaks] Принудительно устанавливаем субтитры: ${config.subtitleLabel}`);
-                            target.click();
-                        }
+                        if (target) target.click();
                     }
 
                     setTimeout(() => {
@@ -189,53 +204,79 @@
                             btn.click();
                         }
                         isRestoring = false;
-                        console.log('[KP Tweaks] Восстановление завершено.');
                     }, 300);
-
                 }, 500);
             }, 400);
         }, 500);
     }
 
     // ==========================================
-    // ЛОГИКА КНОПОК ПРОПУСКА
+    // ЛОГИКА КНОПОК ПРОПУСКА (Заставка, Титры, Реклама)
     // ==========================================
+
+    function applySkipLogic(skipBtn, watchBtn, action) {
+        if (action === 3) { // Ничего не делать
+            if (skipBtn) skipBtn.style.removeProperty('display');
+            if (watchBtn) watchBtn.style.removeProperty('display');
+            return;
+        }
+
+        if (action === 1) { // Авто-пропуск
+            if (watchBtn) watchBtn.style.setProperty('display', 'none', 'important');
+            if (skipBtn) {
+                skipBtn.style.setProperty('display', 'none', 'important');
+                if (!skipBtn.dataset.kpTweaksClicked) {
+                    skipBtn.dataset.kpTweaksClicked = 'true';
+                    console.log(`[KP Tweaks] Авто-пропуск: ${skipBtn.innerText}`);
+                    skipBtn.click();
+                }
+            }
+        } else if (action === 2) { // Режим просмотра
+            if (skipBtn) skipBtn.style.setProperty('display', 'none', 'important');
+            if (watchBtn) {
+                watchBtn.style.setProperty('display', 'none', 'important');
+                if (!watchBtn.dataset.kpTweaksClicked) {
+                    watchBtn.dataset.kpTweaksClicked = 'true';
+                    console.log(`[KP Tweaks] Режим просмотра: ${watchBtn.innerText}`);
+                    watchBtn.click();
+                }
+            }
+        }
+    }
+
     function handleSkipButtons() {
-        const buttons = document.querySelectorAll(SELECTORS.skipBtn);
-        buttons.forEach(btn => {
-            const text = btn.innerText.trim();
+        const allButtons = Array.from(document.querySelectorAll(SELECTORS.skipBtn));
 
-            const isWatch = text.includes('Смотреть заставку') || text.includes('Смотреть титры');
-            const isSkip = text.includes('Пропустить');
+        // Находим все возможные кнопки
+        const skipBtn = allButtons.find(b => b.innerText.trim() === 'Пропустить');
+        const introWatchBtn = allButtons.find(b => b.innerText.includes('Смотреть заставку'));
+        const creditsWatchBtn = allButtons.find(b => b.innerText.includes('Смотреть титры'));
+        const adWatchBtn = allButtons.find(b => b.innerText.includes('Буду смотреть'));
 
-            if (USER_CONFIG.autoSkip === 3) {
-                btn.style.display = '';
-                return;
-            }
-
-            if (USER_CONFIG.autoSkip === 1) {
-                if (isSkip) {
-                    if (!btn.dataset.kpTweaksClicked) {
-                        btn.dataset.kpTweaksClicked = 'true';
-                        console.log(`[KP Tweaks] Авто-пропуск: ${text}`);
-                        btn.click();
+        // 1. Логика для ЗАСТАВКИ
+        if (introWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('заставку'))) {
+            applySkipLogic(skipBtn, introWatchBtn, USER_CONFIG.skipIntroAction);
+        }
+        // 2. Логика для ТИТРОВ
+        else if (creditsWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('титры'))) {
+            applySkipLogic(skipBtn, creditsWatchBtn, USER_CONFIG.skipCreditsAction);
+        }
+        // 3. Логика для РЕКЛАМЫ (если это не заставка и не титры)
+        else if (adWatchBtn || (skipBtn && !skipBtn.parentElement.innerText.includes('заставку') && !skipBtn.parentElement.innerText.includes('титры'))) {
+            if (USER_CONFIG.skipAdAction === 1) { // Авто-пропуск рекламы
+                if (skipBtn) {
+                    skipBtn.style.setProperty('display', 'none', 'important');
+                    if (!skipBtn.dataset.kpTweaksClicked) {
+                        skipBtn.dataset.kpTweaksClicked = 'true';
+                        console.log(`[KP Tweaks] Авто-пропуск рекламы`);
+                        skipBtn.click();
                     }
-                } else if (isWatch) {
-                    btn.style.display = 'none';
                 }
-            } else if (USER_CONFIG.autoSkip === 2) {
-                if (isWatch) {
-                    if (!btn.dataset.kpTweaksClicked) {
-                        btn.dataset.kpTweaksClicked = 'true';
-                        console.log(`[KP Tweaks] Режим просмотра: нажимаем "${text}" для остановки таймера`);
-                        btn.click();
-                    }
-                    btn.style.display = 'none';
-                } else if (isSkip) {
-                    btn.style.display = 'none';
+                if (adWatchBtn) {
+                    adWatchBtn.style.setProperty('display', 'none', 'important');
                 }
             }
-        });
+        }
     }
 
     function createOverlay(btn, id) {
@@ -260,10 +301,20 @@
             btn.click();
         });
 
-        document.body.appendChild(overlay);
+        const parent = document.fullscreenElement || document.body;
+        parent.appendChild(overlay);
 
         setInterval(() => {
-            if (!document.body.contains(btn)) { overlay.remove(); return; }
+            if (!document.body.contains(btn) && !(document.fullscreenElement && document.fullscreenElement.contains(btn))) {
+                overlay.remove();
+                return;
+            }
+
+            const currentParent = document.fullscreenElement || document.body;
+            if (overlay.parentNode !== currentParent) {
+                currentParent.appendChild(overlay);
+            }
+
             const rect = btn.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0 || rect.top < 0 || rect.bottom > window.innerHeight) {
                 overlay.style.display = 'none';
@@ -285,46 +336,55 @@
 
     document.addEventListener('click', saveTracks, true);
 
+    document.addEventListener('fullscreenchange', () => {
+        console.log(`[KP Tweaks] Fullscreen mode: ${!!document.fullscreenElement ? 'ON' : 'OFF'}`);
+        document.querySelectorAll('[id^="kp-overlay-"]').forEach(el => el.remove());
+        setTimeout(handleSkipButtons, 100);
+    });
+
     const monitor = setInterval(() => {
-        // ДЕТЕКТОР SPA-НАВИГАЦИИ
         const nowContentId = getContentId();
         if (nowContentId !== lastContentId) {
-            console.log(`[KP Tweaks] Смена контента: ${lastContentId} -> ${nowContentId}`);
             lastContentId = nowContentId;
-
-            // Загружаем настройки для нового контента
             loadContentConfig();
-
-            // Сбрасываем состояние восстановления
             videoElement = null;
             restoreAttempts = 0;
             isRestoring = false;
-
-            // Удаляем старые оверлеи (они привязаны к устаревшим кнопкам)
             document.querySelectorAll('[id^="kp-overlay-"]').forEach(el => el.remove());
         }
 
         if (!videoElement) {
             videoElement = document.querySelector(SELECTORS.video);
             if (videoElement) {
-                console.log('[KP Tweaks] Видео найдено.');
                 initVolume(videoElement);
+                videoElement.dataset.kpTweaksCurrentSrc = videoElement.src || videoElement.currentSrc || '';
                 setTimeout(restoreTracks, 700);
             }
+        } else {
+            const currentSrc = videoElement.src || videoElement.currentSrc || '';
+            if (currentSrc && videoElement.dataset.kpTweaksCurrentSrc !== currentSrc) {
+                videoElement.dataset.kpTweaksCurrentSrc = currentSrc;
+                restoreAttempts = 0;
+                isRestoring = false;
+                setTimeout(restoreTracks, 1000);
+            }
         }
+
         handleSkipButtons();
 
-        const settingsBtn = document.querySelector(SELECTORS.settingsBtn);
-        if (settingsBtn) createOverlay(settingsBtn, 'settings');
+        if (USER_CONFIG.enableHoverToClick) {
+            const settingsBtn = document.querySelector(SELECTORS.settingsBtn);
+            if (settingsBtn) createOverlay(settingsBtn, 'settings');
 
-        const audioBtn = document.querySelector(SELECTORS.audioBtn);
-        if (audioBtn) createOverlay(audioBtn, 'audio');
+            const audioBtn = document.querySelector(SELECTORS.audioBtn);
+            if (audioBtn) createOverlay(audioBtn, 'audio');
 
-        const seasonsBtn = document.querySelector(SELECTORS.seasonsBtn);
-        if (seasonsBtn) createOverlay(seasonsBtn, 'seasons');
+            const seasonsBtn = document.querySelector(SELECTORS.seasonsBtn);
+            if (seasonsBtn) createOverlay(seasonsBtn, 'seasons');
 
-        const sendBtn = document.querySelector(SELECTORS.sendBtn);
-        if (sendBtn) createOverlay(sendBtn, 'send');
+            const sendBtn = document.querySelector(SELECTORS.sendBtn);
+            if (sendBtn) createOverlay(sendBtn, 'send');
+        }
     }, 500);
 
 })();

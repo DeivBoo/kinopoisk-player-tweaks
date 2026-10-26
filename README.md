@@ -5,15 +5,17 @@ A Tampermonkey userscript designed to enhance the viewing experience on Kinopois
 ## ✨ Features
 
 *   🔊 **Volume Persistence:** Remembers your volume level across sessions and restores it when you return.
-*   🗣️ **Audio Track Persistence:** Saves your selected voiceover/language and applies it automatically.
-*   ⏭️ **Skip Buttons Control:** Automatically clicks the "Skip" or "Watch" buttons for intros and credits (can be toggled on/off).
-*   🖱️ **Menu Behavior Change:** Replaces the annoying hover-based settings menu with a standard click interaction.
-*   🛠️ **Custom Settings Menu:** Provides a sleek, built-in UI to manage your preferences manually.
+*   🗣️ **Audio Track & Subtitle Persistence:** Saves your selected voiceover/language and subtitles per movie/series and applies them automatically.
+*   ⏭️ **Independent Skip Controls:** Separate settings for Intros, Credits, and Ads (Auto-skip, View, or Do nothing).
+*   🖱️ **Menu Behavior Change:** Replaces the hover-based settings menu with a standard click interaction.
+*   🛠️ **Feature Toggles:** Enable or disable volume persistence, track persistence, and menu behavior independently.
+*   🖥️ **Fullscreen Support:** All features, including skip controls, work correctly in fullscreen mode.
+*   🔄 **SPA-Aware:** Settings are re-applied automatically when switching episodes without page reload.
 
 ## 🚀 Installation
 
 1.  Install the **Tampermonkey** extension for your browser ([Chrome](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo), [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/), etc.).
-2.  Click on the link below to install the script:
+2.  Click the link below to install the script:
     *   **[Install Kinopoisk Player Tweaks](https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js)**
 3.  Tampermonkey will prompt you to install. Click "Install".
 4.  Open any movie or series on Kinopoisk and enjoy!
@@ -21,24 +23,30 @@ A Tampermonkey userscript designed to enhance the viewing experience on Kinopois
 ## 🛠️ Tech Stack & Development
 
 This project was developed using a modern, AI-assisted workflow:
-*   **Environment:** WSL 2 (Ubuntu), LM Studio (Bionic AI Agent).
-*   **Testing:** Playwright (via MCP) for automated UI testing.
+*   **Environment:** WSL 2 (Ubuntu), LM Studio (Bionic AI Agent) + Deepseek.
+*   **Testing:** Manual DOM inspection via Chrome DevTools.
 *   **Core:** Vanilla JavaScript (ES6+), Tampermonkey API (`GM_setValue`, `GM_getValue`).
 
 ## 🗺️ Roadmap / Known Issues
 
 *   [x] Volume persistence.
-*   [x] Basic skip buttons toggle.
-*   [ ] **In Progress:** Robust Shadow DOM traversal (current selectors may fail on deeply nested player elements).
-*   [ ] Full audio track persistence (requires adaptation to dynamic React rendering).
+*   [x] Per-content audio/subtitle persistence.
+*   [x] Independent skip controls for Intro/Credits/Ads.
+*   [x] Fullscreen mode support.
+*   [x] SPA episode switching support.
+*   [x] Feature toggles.
+*   [ ] **In Progress:** Capturing real ad button HTML to refine ad-skip selectors.
 
 ## 🇷🇺 Описание на русском
 
 Пользовательский скрипт для Tampermonkey, улучшающий работу плеера на Кинопоиске.
+
 Основные функции:
-*   Сохранение уровня громкости, выбранной аудиодорожки и выставленных субтитров.
-*   Автоматическое нажатие кнопок пропуска или просмотра заставки/титров (функцию можно включить или выключить).
+*   Сохранение уровня громкости, выбранной аудиодорожки и субтитров (для каждого фильма/сериала отдельно).
+*   Независимое управление кнопками пропуска для заставки, титров и рекламы (авто-пропуск, режим просмотра или ничего не делать).
 *   Изменение поведения меню настроек (открытие по клику вместо наведения).
+*   Переключатели для каждой функции (можно отключить ненужное).
+*   Корректная работа в полноэкранном режиме и при переключении серий без перезагрузки страницы.
 
 **Установка:** Установите Tampermonkey, нажмите на ссылку для установки скрипта (см. выше) и подтвердите установку.
 

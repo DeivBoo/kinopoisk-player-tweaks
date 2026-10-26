@@ -1,15 +1,15 @@
 # Project Context: Kinopoisk Player Tweaks
 
 ## 🎯 About the Project
-Development of a Tampermonkey userscript to modify the player on the Kinopoisk HD website (hd.kinopoisk.ru). 
+Development of a Tampermonkey userscript to modify the player on the Kinopoisk website (hd.kinopoisk.ru).
 Goal: Improve UX by persisting user settings (per-content) and modifying interface behavior.
 
 ## 🚨 CURRENT FOCUS (Активная задача)
-**Project is STABLE at v1.0.0**
-All core features implemented and the URL parsing bug is fixed.
+**Project is STABLE at v1.0.1**
+All core features implemented. Bug fixes for fullscreen and episode switching are merged.
 - Volume (global)
 - Audio/Subtitle (per-content, using `rt` param or `pathname`)
-- Skip Buttons Control (`USER_CONFIG.autoSkip`)
+- Skip Buttons Control (separate actions for Intro, Credits, and Ads)
 - Smart Overlays for Hover-to-Click
 
 ## 🛠 Tech Stack
@@ -19,22 +19,26 @@ All core features implemented and the URL parsing bug is fixed.
 *   **Testing:** Manual DOM inspection via Chrome DevTools.
 
 ## 📂 Project Structure
-*   `kinopoisk-tweaks.user.js` - main userscript (v1.0.0).
+*   `kinopoisk-tweaks.user.js` - main userscript (v1.0.1).
 *   `AGENTS.md` - this file.
 
 ## 🎯 Core Tasks (Feature Roadmap)
 1.  [x] **Volume Persistence:** Global volume memory.
 2.  [x] **Per-Content Settings:** Audio/Subtitle settings saved under `audioTrackLabel_<contentId>`.
 3.  [x] **Subtitle Persistence:** Forced click after audio change.
-4.  [x] **Skip Buttons Control:** `USER_CONFIG.autoSkip` (1: Auto, 2: View, 3: None).
+4.  [x] **Skip Buttons Control:** Separate `skipIntroAction`, `skipCreditsAction` (1: Auto, 2: View, 3: None) and `skipAdAction` (1: Auto, 2: None)
 5.  [x] **Menu Behavior Change (Hover-to-Click):** "Smart Overlay" for 4 UI panels.
-6.  [x] **Fix Content ID Parsing (Bug Fixed):** `getContentId()` now prioritizes `rt` URL parameter to correctly identify the playing series, avoiding settings bleed from promo pages.
+6.  [x] **Fix Content ID Parsing (Bug Fixed):** `getContentId()` now prioritizes `rt` URL parameter.
+7.  [x] **Fullscreen Bug Fix:** Skip logic now works correctly in fullscreen mode.
+8.  [x] **Episode Switch Bug Fix:** `src` change detection triggers track restoration.
+9.  [x] **Independent Feature Toggles:** `enableVolumePersistence`, `enableTrackPersistence`, `enableHoverToClick`.
 
 ## ⚙️ Technical Implementation Details
-*   **USER_CONFIG Block:** Settings at the top (`defaultVolume`, `autoSkip`).
+*   **USER_CONFIG Block:** Settings at the top (`defaultVolume`, `skipIntroAction`, `skipCreditsAction`, `skipAdAction`).
 *   **Per-Content Storage:** `getContentId()` checks `rt` param first, then pathname. Keys in storage are suffixed.
 *   **The "Smart Overlay" Trick:** Transparent `div` blocks `mouseover` to prevent menus opening on hover. If `aria-expanded="true"`, `pointer-events: none` allows the second click to close the menu natively.
 *   **Restore Order:** Audio -> 500ms -> Subtitles -> 300ms -> Close menu.
+*   **Skip Button Detection:** Identifies Intro vs Credits vs Ads by button text (`Смотреть заставку`, `Смотреть титры`, `Буду смотреть`).
 
 ## ⚠️ Technical Constraints and Rules (CRITICAL)
 1.  **NO GLOBAL MUTATION OBSERVERS:** Use `setInterval` for polling.
@@ -43,11 +47,11 @@ All core features implemented and the URL parsing bug is fixed.
 4.  **NO BLIND EVENT OVERRIDES:** Use the Overlay trick.
 
 ## 🐞 Known Issues
-*   None. (The URL parsing bug is fixed).
+*   Ad button HTML not yet fully captured; fallback logic is in place but may need selector updates once ad DOM is inspected.
 
 ## 🛑 Git Workflow Rules
 *   Do NOT run `git push`. Only `git add` and `git commit`.
 
 ## 📝 Current Status
-*   [x] Stable v1.0.0 committed.
-*   [!] Known Issue: None.
+*   [x] Stable v1.0.1 committed.
+*   [!] Known Issue: Ad button selectors are best-effort until real ad HTML is available.
