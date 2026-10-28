@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk Player Tweaks
 // @namespace    https://github.com/DeivBoo/kinopoisk-player-tweaks
-// @version      1.0.1
+// @version      1.0.2
 // @description  Улучшение плеера Кинопоиска: сохранение состояния громкости, субтитров и аудиодорожек, управление кнопками пропуска и меню настроек.
 // @author       DeivBoo
 // @match        https://hd.kinopoisk.ru/*
@@ -20,21 +20,13 @@
     // ==========================================
     const USER_CONFIG = {
         // --- Переключатели функций (true - вкл, false - выкл) ---
-
-        // Сохранять и восстанавливать уровень громкости
         enableVolumePersistence: true,
-
-        // Сохранять и восстанавливать аудиодорожки и субтитры
         enableTrackPersistence: true,
-
-        // Умные панели: открывать меню настроек по клику, а не при наведении
         enableHoverToClick: true,
 
         // --- Дополнительные настройки ---
 
         // Стандартная громкость (от 0 до 100).
-        // Работает при включенном enableVolumePersistence
-        // и отсутствии данных о ранее выставленной громкости
         defaultVolume: 100,
 
         // Управление заставкой (вступлением):
@@ -44,7 +36,7 @@
         skipIntroAction: 2,
 
         // Управление титрами:
-        // 1 - Авто-пропуск (клик "Пропустить", скрытие "Смотреть титры")
+        // 1 - Авто-пропуск (клик "Пропустить" или "Следующая серия", скрытие "Смотреть титры")
         // 2 - Режим просмотра (клик "Смотреть титры", скрытие "Пропустить")
         // 3 - Ничего не скрывать и не нажимать
         skipCreditsAction: 2,
@@ -56,7 +48,7 @@
     };
     // ==========================================
 
-    console.log('[KP Tweaks] Скрипт v1.0.0 запущен.');
+    console.log('[KP Tweaks] Скрипт v1.0.2 запущен.');
 
     const getVal = (key, defaultVal) => {
         try { return typeof GM_getValue === 'function' ? GM_getValue(key, defaultVal) : defaultVal; }
@@ -118,7 +110,8 @@
         sendBtn: '[aria-label="Отправить на устройство"], [aria-label="На устройство"]',
         seasonsBtn: '[class*="episodeNavigatorButton"]',
         skipBtn: 'button[data-tid="BaseButton"]',
-        audioInputs: 'input[type="radio"]'
+        audioInputs: 'input[type="radio"]',
+        adContainer: '[data-tid="MoviePrerollView"]' // Новый селектор для рекламы
     };
 
     let videoElement = null;
@@ -211,28 +204,37 @@
     }
 
     // ==========================================
-    // ЛОГИКА КНОПОК ПРОПУСКА (Заставка, Титры, Реклама)
+    // ЛОГИКА КНОПОК ПРОПУСКА
     // ==========================================
 
-    function applySkipLogic(skipBtn, watchBtn, action) {
+    function applySkipLogic(action, mainSkipBtn, watchBtn, alternativeSkipBtn = null) {
         if (action === 3) { // Ничего не делать
-            if (skipBtn) skipBtn.style.removeProperty('display');
+            if (mainSkipBtn) mainSkipBtn.style.removeProperty('display');
             if (watchBtn) watchBtn.style.removeProperty('display');
+            if (alternativeSkipBtn) alternativeSkipBtn.style.removeProperty('display');
             return;
         }
 
         if (action === 1) { // Авто-пропуск
             if (watchBtn) watchBtn.style.setProperty('display', 'none', 'important');
-            if (skipBtn) {
-                skipBtn.style.setProperty('display', 'none', 'important');
-                if (!skipBtn.dataset.kpTweaksClicked) {
-                    skipBtn.dataset.kpTweaksClicked = 'true';
-                    console.log(`[KP Tweaks] Авто-пропуск: ${skipBtn.innerText}`);
-                    skipBtn.click();
+            
+            if (mainSkipBtn) {
+                mainSkipBtn.style.setProperty('display', 'none', 'important');
+                if (!mainSkipBtn.dataset.kpTweaksClicked) {
+                    mainSkipBtn.dataset.kpTweaksClicked = 'true';
+                    console.log(`[KP Tweaks] Авто-пропуск: ${mainSkipBtn.innerText}`);
+                    mainSkipBtn.click();
+                }
+            } else if (alternativeSkipBtn) {
+                // Если кнопки "Пропустить" нет, но есть "Следующая серия"
+                if (!alternativeSkipBtn.dataset.kpTweaksClicked) {
+                    alternativeSkipBtn.dataset.kpTweaksClicked = 'true';
+                    console.log(`[KP Tweaks] Авто-переход: ${alternativeSkipBtn.innerText}`);
+                    alternativeSkipBtn.click();
                 }
             }
         } else if (action === 2) { // Режим просмотра
-            if (skipBtn) skipBtn.style.setProperty('display', 'none', 'important');
+            if (mainSkipBtn) mainSkipBtn.style.setProperty('display', 'none', 'important');
             if (watchBtn) {
                 watchBtn.style.setProperty('display', 'none', 'important');
                 if (!watchBtn.dataset.kpTweaksClicked) {
@@ -252,18 +254,12 @@
         const introWatchBtn = allButtons.find(b => b.innerText.includes('Смотреть заставку'));
         const creditsWatchBtn = allButtons.find(b => b.innerText.includes('Смотреть титры'));
         const adWatchBtn = allButtons.find(b => b.innerText.includes('Буду смотреть'));
+        const nextEpisodeBtn = allButtons.find(b => b.innerText.includes('Следующая серия'));
 
-        // 1. Логика для ЗАСТАВКИ
-        if (introWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('заставку'))) {
-            applySkipLogic(skipBtn, introWatchBtn, USER_CONFIG.skipIntroAction);
-        }
-        // 2. Логика для ТИТРОВ
-        else if (creditsWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('титры'))) {
-            applySkipLogic(skipBtn, creditsWatchBtn, USER_CONFIG.skipCreditsAction);
-        }
-        // 3. Логика для РЕКЛАМЫ (если это не заставка и не титры)
-        else if (adWatchBtn || (skipBtn && !skipBtn.parentElement.innerText.includes('заставку') && !skipBtn.parentElement.innerText.includes('титры'))) {
-            if (USER_CONFIG.skipAdAction === 1) { // Авто-пропуск рекламы
+        // 1. Логика для РЕКЛАМЫ (Приоритет №1, если найден контейнер рекламы)
+        const adContainer = document.querySelector(SELECTORS.adContainer);
+        if (adContainer) {
+            if (USER_CONFIG.skipAdAction === 1) {
                 if (skipBtn) {
                     skipBtn.style.setProperty('display', 'none', 'important');
                     if (!skipBtn.dataset.kpTweaksClicked) {
@@ -276,6 +272,16 @@
                     adWatchBtn.style.setProperty('display', 'none', 'important');
                 }
             }
+            return; // Выходим, так как это реклама. Остальные проверки не нужны.
+        }
+
+        // 2. Логика для ЗАСТАВКИ
+        if (introWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('заставку'))) {
+            applySkipLogic(USER_CONFIG.skipIntroAction, skipBtn, introWatchBtn);
+        }
+        // 3. Логика для ТИТРОВ (с проверкой на "Следующая серия")
+        else if (creditsWatchBtn || (skipBtn && skipBtn.parentElement.innerText.includes('титры'))) {
+            applySkipLogic(USER_CONFIG.skipCreditsAction, skipBtn, creditsWatchBtn, nextEpisodeBtn);
         }
     }
 
