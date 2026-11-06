@@ -8,6 +8,7 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @license      MIT
 // @downloadURL  https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js
 // @updateURL    https://raw.githubusercontent.com/DeivBoo/kinopoisk-player-tweaks/main/kinopoisk-tweaks.user.js
 // ==/UserScript==
